@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetraVision - Explainable AI for Retinal Screening | Rural Primary Health Center Edition</title>
+    <meta name="description" content="Explainable AI diagnostic screening platform for Diabetic Retinopathy in rural Primary Health Centers. Features EfficientNet deep learning and Grad-CAM lesion explainability heatmaps.">
+    
+    <!-- Design tokens & Stylesheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <header class="navbar" role="banner">
+        <div class="logo-group">
+            <div class="logo-icon" aria-hidden="true">👁️</div>
+            <div class="brand-text">
+                <h1>NetraVision <span class="brand-badge">PHC Edition</span></h1>
+                <div class="brand-sub">Explainable AI (XAI) for Retinal Screening • Rural Tele-Ophthalmology</div>
+            </div>
+        </div>
+        <div class="nav-stats">
+            <div class="status-pill" id="systemStatusPill">
+                <span class="status-dot"></span>
+                <span id="systemStatusText">EfficientNet-B0 Ready (CPU/GPU)</span>
+            </div>
+            <div class="status-pill">
+                <span>📍 Tele-Ophthalmology Grid</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="container" role="main">
+        <div class="app-grid">
+            
+            <!-- LEFT PANEL: Patient Intake & Fundus Ingestion -->
+            <section class="glass-panel intake-panel" aria-label="Patient Registration and Image Upload">
+                
+                <div class="panel-header">
+                    <h2 class="panel-title"><span class="panel-icon">📋</span> Patient Intake & History</h2>
+                    <button type="button" class="btn-secondary" id="btnNewPatient" style="padding:4px 10px; font-size:11px;" onclick="generateInitialPatientId()">+ New ID</button>
+                </div>
+
+                <form id="screeningForm" onsubmit="event.preventDefault();">
+                    <div class="form-group">
+                        <label class="form-label" for="patientId">Rural Patient ID</label>
+                        <input type="text" id="patientId" class="form-input" placeholder="e.g. NV-PHC-2026-0842" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="patientName">Full Name</label>
+                        <input type="text" id="patientName" class="form-input" placeholder="e.g. Ramesh Kumar" value="Ramesh Kumar" required />
+                    </div>
+
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label class="form-label" for="patientAge">Age (Years)</label>
+                            <input type="number" id="patientAge" class="form-input" value="54" min="1" max="110" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="patientGender">Gender</label>
+                            <select id="patientGender" class="form-select">
+                                <option value="Male" selected>Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label class="form-label" for="diabetesDuration">Diabetes (Yrs)</label>
+                            <input type="number" id="diabetesDuration" class="form-input" value="8" step="0.5" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="knownHba1c">HbA1c (%)</label>
+                            <input type="number" id="knownHba1c" class="form-input" value="8.4" step="0.1" placeholder="Optional" />
+                        </div>
+                    </div>
+
+                    <!-- Eye Selection OD / OS -->
+                    <div class="form-group">
+                        <label class="form-label">Eye Examined</label>
+                        <div class="eye-selector" role="radiogroup" aria-label="Eye Selection">
+                            <button type="button" class="eye-btn active" data-eye="OD" id="btnEyeOD">Right Eye (OD)</button>
+                            <button type="button" class="eye-btn" data-eye="OS" id="btnEyeOS">Left Eye (OS)</button>
+                        </div>
+                    </div>
+
+                    <!-- Fundus Image Upload / Capture -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label class="form-label">Fundus Camera Retinal Scan</label>
+                        
+                        <div class="upload-dropzone" id="uploadDropzone" tabindex="0" role="button" aria-label="Upload Retinal Fundus Scan">
+                            <div class="dropzone-icon">📷</div>
+                            <div class="dropzone-text">Drop Fundus Image or Click to Browse</div>
+                            <div class="dropzone-sub">Supports JPEG, PNG from standard handheld or table-top fundus cameras</div>
+                            <input type="file" id="fundusFileInput" accept="image/jpeg,image/png" style="display: none;" />
+                        </div>
+                    </div>
+
+                    <!-- Quick Clinical Samples -->
+                    <div class="samples-section">
+                        <div class="form-label" style="display:flex; justify-content:space-between;">
+                            <span>Built-in Clinical Test Scans</span>
+                            <span style="color:var(--accent-cyan); font-weight:normal; text-transform:none;">Instant Demo</span>
+                        </div>
+                        <div class="samples-grid" id="samplesGrid" aria-label="Clinical sample selections">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Selected Image Preview Thumbnail -->
+                    <div id="imagePreviewArea" style="display:none; margin-top:16px; background:var(--bg-surface); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <img id="previewImg" src="" alt="Selected Fundus Preview" style="width:48px; height:48px; object-fit:cover; border-radius:4px;" />
+                            <div style="flex:1; overflow:hidden;">
+                                <div id="previewTitle" style="font-size:12px; font-weight:600; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">Fundus Scan Ready</div>
+                                <div id="qaMetricsBadge" style="font-size:11px; color:var(--accent-emerald);">Diagnostic Quality Assessment Pending</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Button -->
+                    <button type="button" class="btn-primary" id="btnRunScreening" disabled>
+                        <span>⚡ Run AI Diagnostic Screening</span>
+                    </button>
+                </form>
+            </section>
+
+            <!-- RIGHT PANEL: Explainable AI Results & Split Viewport -->
+            <section class="results-container" id="resultsContainer" aria-label="AI Diagnostic Results">
+                
+                <!-- Severity Verdict Banner -->
+                <div class="severity-banner grade-2" id="severityBanner">
+                    <div class="severity-title-group">
+                        <div class="category-label" id="severityCategoryLabel">Right Eye (OD) • Clinical Severity</div>
+                        <h2 id="severityGradeTitle">Select or Upload a Fundus Scan to Begin</h2>
+                        <div class="severity-desc" id="severityDescription">
+                            NetraVision uses deep learning and Explainable AI (Grad-CAM) to identify microaneurysms, hemorrhages, and lipid exudates on the retinal surface.
+                        </div>
+                    </div>
+                    <div class="confidence-gauge">
+                        <div class="confidence-number" id="confidenceScoreNumber">--%</div>
+                        <div class="confidence-label">AI Confidence</div>
+                    </div>
+                </div>
+
+                <!-- Explainability Viewport Card -->
+                <div class="glass-panel xai-viewport-card">
+                    <div class="viewport-toolbar">
+                        <div class="view-tabs" role="tablist">
+                            <button type="button" class="view-tab active" data-mode="split" id="tabSplit">Curtain Split Slider</button>
+                            <button type="button" class="view-tab" data-mode="side-by-side" id="tabSideBySide">Side-by-Side</button>
+                            <button type="button" class="view-tab" data-mode="heatmap" id="tabHeatmap">Attention Heatmap</button>
+                            <button type="button" class="view-tab" data-mode="enhanced" id="tabEnhanced">CLAHE Enhanced</button>
+                        </div>
+
+                        <div class="xai-controls">
+                            <div class="control-item">
+                                <label for="colormapSelect">Colormap:</label>
+                                <select id="colormapSelect" class="form-select" style="padding:4px 8px; font-size:11px; width:auto;">
+                                    <option value="jet" selected>Jet (Clinical Standard)</option>
+                                    <option value="inferno">Inferno</option>
+                                    <option value="turbo">Turbo</option>
+                                </select>
+                            </div>
+                            <div class="control-item">
+                                <label for="opacitySlider">Opacity:</label>
+                                <input type="range" id="opacitySlider" min="0.2" max="0.9" step="0.05" value="0.55" style="width:70px;" />
+                                <span id="opacityValue" style="font-family:var(--font-mono); font-size:11px;">55%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 1. Interactive Curtain Split Slider View -->
+                    <div class="split-slider-container" id="splitSliderContainer" aria-label="Before and After Grad-CAM Comparison">
+                        <!-- Bottom Layer: Original Fundus Scan -->
+                        <div class="split-layer layer-original">
+                            <img id="sliderOriginalImg" src="" alt="Original Retinal Fundus Scan" />
+                            <div class="split-label right">Original Fundus Scan</div>
+                        </div>
+                        <!-- Top Layer: Grad-CAM Overlay (Clipped) -->
+                        <div class="split-layer layer-overlay" id="layerOverlay">
+                            <img id="sliderOverlayImg" src="" alt="Grad-CAM Lesion Heatmap" />
+                            <div class="split-label left">XAI Grad-CAM Heatmap</div>
+                        </div>
+                        <!-- Draggable Divider -->
+                        <div class="split-divider" id="splitDivider" role="slider" aria-label="Curtain Divider" aria-valuenow="50">
+                            <div class="split-handle">↔</div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Side-by-Side View -->
+                    <div id="sideBySideContainer" style="display:none; grid-template-columns:1fr 1fr; gap:16px; height:420px;">
+                        <div style="background:#000; border-radius:var(--radius-sm); overflow:hidden; position:relative;">
+                            <img id="sideBySideOriginal" src="" alt="Original Scan" style="width:100%; height:100%; object-fit:contain;" />
+                            <div class="split-label left">Original Fundus</div>
+                        </div>
+                        <div style="background:#000; border-radius:var(--radius-sm); overflow:hidden; position:relative;">
+                            <img id="sideBySideHeatmap" src="" alt="Grad-CAM Heatmap" style="width:100%; height:100%; object-fit:contain;" />
+                            <div class="split-label right">Grad-CAM Overlay</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Raw Heatmap View -->
+                    <div id="rawHeatmapContainer" style="display:none; height:420px; background:#000; border-radius:var(--radius-sm); overflow:hidden; position:relative;">
+                        <img id="rawHeatmapImg" src="" alt="Raw Grad-CAM Heatmap" style="width:100%; height:100%; object-fit:contain;" />
+                        <div class="split-label left">Isolated Feature Activation Heatmap</div>
+                    </div>
+
+                    <!-- 4. CLAHE Enhanced View -->
+                    <div id="claheContainer" style="display:none; height:420px; background:#000; border-radius:var(--radius-sm); overflow:hidden; position:relative;">
+                        <img id="claheEnhancedImg" src="" alt="CLAHE Enhanced Fundus" style="width:100%; height:100%; object-fit:contain;" />
+                        <div class="split-label left">CLAHE Green-Channel Contrast Normalized</div>
+                    </div>
+                </div>
+
+                <!-- Two-Column Diagnostic Breakdown -->
+                <div class="detail-grid">
+                    
+                    <!-- Probability Distribution -->
+                    <div class="glass-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title"><span class="panel-icon">📊</span> Severity Probability Breakdown</h3>
+                        </div>
+                        <div id="probabilityBars">
+                            <div style="text-align:center; color:var(--text-muted); padding:20px;">
+                                Awaiting retinal screening inference...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flagged Lesions & Capillary Hotspots -->
+                    <div class="glass-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title"><span class="panel-icon">🔬</span> XAI Flagged Lesion Hotspots</h3>
+                        </div>
+                        <table class="lesion-table">
+                            <thead>
+                                <tr>
+                                    <th>ROI</th>
+                                    <th>Quadrant</th>
+                                    <th>Attention</th>
+                                    <th>Clinical Interpretation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lesionsTableBody">
+                                <tr>
+                                    <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">
+                                        Run screening to extract lesion coordinates.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Primary Health Center Care Protocol Directives -->
+                <div class="glass-panel action-box">
+                    <div class="action-header">
+                        <span>🏥</span>
+                        <span>Primary Health Center Clinical Action Protocol (ICDR Standard)</span>
+                    </div>
+                    <ul class="action-list" id="clinicalActionList">
+                        <li>Register patient demographic information and capture a clear fundus camera scan.</li>
+                        <li>The Explainable AI model evaluates vascular abnormalities and generates a Grad-CAM heatmap overlay.</li>
+                        <li>High-risk patients (Grades 2-4) will receive instant referral directives for district tele-ophthalmology triage.</li>
+                    </ul>
+                    <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+                        <button type="button" class="btn-primary" id="btnPrintReport" style="width:auto; margin-top:0; padding:10px 20px;">
+                            <span>🖨️ Generate & Print Official Report</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Screenings Archive -->
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title"><span class="panel-icon">📁</span> Recent Clinic Screenings Log</h3>
+                        <button type="button" class="btn-secondary" onclick="loadRecentScreenings()" style="padding:4px 10px; font-size:11px;">🔄 Refresh</button>
+                    </div>
+                    <table class="lesion-table">
+                        <thead>
+                            <tr>
+                                <th>Patient ID</th>
+                                <th>Patient Name</th>
+                                <th>Eye</th>
+                                <th>Severity Grade</th>
+                                <th>Confidence</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="screeningsArchiveBody">
+                            <tr>
+                                <td colspan="6" style="text-align:center; color:var(--text-muted); padding:16px;">Loading screening records...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- Clinical Analysis Processing Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" role="dialog" aria-modal="true" aria-label="Screening in progress">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingTitle">Processing Retinal Scan...</div>
+        <div class="loading-sub" id="loadingSub">Centering fundus circle and assessing optical sharpness...</div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
