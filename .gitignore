@@ -1,21 +1,16 @@
-# SQLite database
-*.db
-*.sqlite
-*.sqlite3
-
-# Python
+.venv/
 __pycache__/
 *.pyc
-.venv/
-venv/
-
-# Environment secrets
-.env
-
-# Uploaded patient images
-uploads/
-
-# AI model files
-*.pth
-*.pt
-*.h5
+*.pyo
+*.pyd
+*.log
+backend/data/*.db
+bore.exe
+bore.zip
+cloudflared.exe
+vc_redist.x64.exe
+uv.exe
+uv.zip
+uvw.exe
+uvx.exe
+server_output.log
